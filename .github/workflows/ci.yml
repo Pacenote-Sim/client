@@ -1,0 +1,102 @@
+# The checks the Makefile runs, run on every change, on the three systems the
+# client is built on or for: Linux (what a server compiles it on), Windows (what
+# a driver runs) and macOS (where it is developed).
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: go test (${{ matrix.os }}, ${{ matrix.go }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        go: ["1.26"]
+        include:
+          - os: ubuntu-latest
+            go: stable
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Build and vet
+        run: |
+          make build
+          make vet
+
+      - name: Test
+        run: make test
+
+      - name: Coverage
+        if: runner.os != 'Windows'
+        run: make cover
+
+      # Once each. Not a measurement — a benchmark that no longer compiles is
+      # one nobody finds until they need it.
+      - name: Benchmarks still run
+        run: make bench-smoke
+
+      - name: The Windows exes build, the window included, without cgo
+        if: runner.os == 'Linux'
+        run: make build-windows
+
+      - name: The window builds on Windows itself
+        if: runner.os == 'Windows'
+        run: go build -tags wails ./cmd/pacenote
+
+  lint:
+    name: golangci-lint, gofumpt, tidy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.26"
+
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.13.2 # matches the local toolchain; Renovate bumps it
+
+      - name: gofumpt
+        run: |
+          go install mvdan.cc/gofumpt@v0.12.0
+          test -z "$(gofumpt -l .)" || { gofumpt -l .; exit 1; }
+
+      # -diff fails rather than rewriting, so the module graph a tag builds from
+      # is the one that was reviewed.
+      - name: go mod tidy is a no-op
+        run: go mod tidy -diff
+
+  vuln:
+    name: govulncheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.26"
+      - run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - run: govulncheck ./...

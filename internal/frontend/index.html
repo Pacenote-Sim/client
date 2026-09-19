@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pacenote</title>
+<style>
+  :root {
+    --bg: #0A0A0A; --card: #0F0F0F; --nested: #141414; --border: #1F1F1F; --border-strong: rgba(255,255,255,.2);
+    --text: #FFFFFF; --muted: #A0A0A0; --faint: #6A6A6A; --good: #7DD87D; --bad: #FF6B6B;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --chamfer: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+    --chamfer-sm: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; user-select: none; -webkit-user-select: none; }
+  .wrap { padding: 18px 18px 24px; display: flex; flex-direction: column; gap: 12px; min-height: 100%; }
+  header { display: flex; align-items: baseline; gap: 12px; }
+  header .name { font-weight: 700; font-size: 16px; }
+  .wm { font-family: var(--mono); font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); border-left: 1px solid var(--border); padding-left: 12px; }
+  header .server { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 11px; color: var(--faint); letter-spacing: .5px; }
+  .card { background: var(--card); border: 1px solid var(--border); clip-path: var(--chamfer); padding: 16px 18px; min-width: 0; overflow: hidden; }
+  .card h2 { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+  .label { font-family: var(--mono); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--faint); }
+  .big { font-size: 28px; font-weight: 700; letter-spacing: -.5px; line-height: 1.1; margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
+  .muted { color: var(--muted); }
+  .good { color: var(--good); } .bad { color: var(--bad); }
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 16px; margin-top: 10px; }
+  .grid div { min-width: 0; }
+  .grid div span { display: block; }
+  .grid .v { font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .code { font-family: var(--mono); font-size: 34px; letter-spacing: 6px; margin: 6px 0; }
+  a { color: var(--text); }
+  .row { display: flex; align-items: baseline; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); cursor: pointer; }
+  .row:first-of-type { border-top: none; }
+  .row .n { font-weight: 600; }
+  .row .n { flex: none; }
+  .row .s { color: var(--muted); margin-left: auto; text-align: right; font-size: 13px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row.dormant .n { color: var(--faint); }
+  .page { margin-top: 10px; padding: 12px 14px; background: var(--nested); border: 1px solid var(--border); clip-path: var(--chamfer-sm); color: var(--muted); max-height: 40vh; overflow: auto; user-select: text; -webkit-user-select: text; }
+  .page h2, .page h3 { color: var(--text); font-size: 13px; margin: 0 0 6px; }
+  .page ul { margin: 0; padding-left: 18px; }
+  .page input[type=range] { width: 100%; accent-color: #fff; }
+  .page select, .page input[type=text], .page input[type=number] { background: var(--bg); color: var(--text); border: 1px solid var(--border-strong); clip-path: var(--chamfer-sm); padding: 6px 10px; font: inherit; }
+  .page label { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--faint); margin: 8px 0 2px; }
+  .page button { background: #fff; color: #0A0A0A; border: 0; font: inherit; font-weight: 600; padding: 6px 14px; clip-path: var(--chamfer-sm); cursor: pointer; }
+  .pill { display: inline-block; font-family: var(--mono); font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; padding: 2px 8px; border: 1px solid var(--border-strong); clip-path: var(--chamfer-sm); }
+  .pill.good { border-color: var(--good); }
+  .pill.bad { border-color: var(--bad); }
+  footer { margin-top: auto; font-family: var(--mono); font-size: 10px; letter-spacing: 1px; color: var(--faint); text-transform: uppercase; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="name">Pacenote</span><span class="wm">client</span>
+    <span class="server" id="server"></span>
+  </header>
+
+  <section class="card" id="pairCard" hidden>
+    <h2>Pair this machine</h2>
+    <p class="muted" style="margin:0">Open the team's server and enter this code. It is waiting.</p>
+    <div class="code" id="pairCode">···-···</div>
+    <a id="pairLink" href="#" target="_blank" rel="noreferrer"></a>
+  </section>
+
+  <section class="card" id="statusCard">
+    <div style="display:flex;align-items:baseline;gap:10px">
+      <span class="label">Driver</span>
+      <span id="driver" class="muted">not paired</span>
+      <span id="car" class="muted"></span>
+      <span id="pill" class="pill" style="margin-left:auto">idle</span>
+    </div>
+    <div class="big" id="lapTime">—</div>
+    <div class="label" id="lapLabel">last lap</div>
+    <div class="grid">
+      <div><span class="label">Simulator</span><span class="v" id="source">—</span></div>
+      <div><span class="label">Track</span><span class="v" id="track">—</span></div>
+      <div><span class="label">Lap</span><span class="v" id="lap">—</span></div>
+      <div><span class="label">Waiting to send</span><span class="v" id="queued">0</span></div>
+    </div>
+    <p class="muted" id="message" style="margin:10px 0 0"></p>
+    <p class="bad" id="error" style="margin:10px 0 0" hidden></p>
+  </section>
+
+  <section class="card" id="pluginsCard">
+    <h2>Plugins</h2>
+    <div id="plugins"><p class="muted" style="margin:0">None. A plugin appears here when this client was built with it and the server runs its other half.</p></div>
+    <div class="page" id="page" hidden></div>
+  </section>
+
+  <footer id="version"></footer>
+</div>
+
+<script type="module">
+  import { Call, Events } from '/wails/runtime.js';
+  const SVC = 'github.com/pacenote-sim/client/internal/desktop.App';
+  const api = {
+    Status:     () => Call.ByName(SVC + '.Status'),
+    Companions: () => Call.ByName(SVC + '.Companions'),
+    Act:        (plugin, action, values) => Call.ByName(SVC + '.Act', plugin, action, values),
+    Open:       (address) => Call.ByName(SVC + '.Open', address),
+  };
+  const $ = (id) => document.getElementById(id);
+  let selected = null;
+
+  const lapTime = (ms) => ms > 0 ? `${Math.floor(ms / 60000)}:${String(Math.floor(ms % 60000 / 1000)).padStart(2, '0')}.${String(ms % 1000).padStart(3, '0')}` : '—';
+
+  function render(v) {
+    const s = v.status || {};
+    $('server').textContent = (s.Server || '').replace(/^https?:\/\//, '');
+    $('version').textContent = 'pacenote ' + (v.version || '');
+    $('pairCard').hidden = !v.pairing || s.Paired;
+    if (v.pairing) { $('pairCode').textContent = v.pairing.code; $('pairLink').textContent = v.pairing.url; $('pairLink').href = v.pairing.url; $('pairLink').onclick = (e) => { e.preventDefault(); open(v.pairing.url); }; }
+    $('driver').textContent = s.Paired ? (s.Driver || 'paired') : 'not paired';
+    $('driver').className = s.Paired ? '' : 'muted';
+    $('car').textContent = s.Car ? (s.CarClass ? s.Car + ' · ' + s.CarClass : s.Car) : '';
+    const pill = $('pill');
+    if (!s.Paired) { pill.textContent = 'not paired'; pill.className = 'pill bad'; }
+    else if (s.Stint) { pill.textContent = 'capturing'; pill.className = 'pill good'; }
+    else if (s.Source) { pill.textContent = s.Source; pill.className = 'pill'; }
+    else { pill.textContent = 'waiting'; pill.className = 'pill'; }
+    $('lapTime').textContent = lapTime(s.LastLapMs);
+    $('source').textContent = s.Source || '—';
+    $('track').textContent = s.Track || '—';
+    $('lap').textContent = s.Stint ? String(s.Lap) : '—';
+    $('queued').textContent = String(s.Queued || 0);
+    $('message').textContent = s.Message || '';
+    $('error').hidden = !v.error; $('error').textContent = v.error || '';
+    renderPlugins(v.plugins || []);
+  }
+
+  function renderPlugins(rows) {
+    const box = $('plugins');
+    if (!rows.length) { box.innerHTML = '<p class="muted" style="margin:0">None. A plugin appears here when this client was built with it and the server runs its other half.</p>'; $('page').hidden = true; return; }
+    box.innerHTML = '';
+    for (const p of rows) {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = `<span class="n"></span><span class="s"></span>`;
+      row.querySelector('.n').textContent = p.name;
+      row.querySelector('.s').textContent = p.status || '';
+      row.onclick = () => { selected = selected === p.name ? null : p.name; showPage(rows); };
+      box.appendChild(row);
+    }
+    showPage(rows);
+  }
+
+  // A companion's page is HTML it wrote; it is shown without running anything
+  // in it. Its controls are forms and inputs with a data-action: using one
+  // sends the action and the values to the companion, which redraws the page.
+  function showPage(rows) {
+    const p = rows.find(r => r.name === selected);
+    const el = $('page');
+    if (!p || !p.page) { el.hidden = true; el.innerHTML = ''; return; }
+    const doc = new DOMParser().parseFromString(p.page, 'text/html');
+    doc.querySelectorAll('script, iframe, object, embed, link, style').forEach(n => n.remove());
+    doc.querySelectorAll('*').forEach(n => { for (const a of [...n.attributes]) if (/^on/i.test(a.name) || /^javascript:/i.test(a.value)) n.removeAttribute(a.name); });
+    el.innerHTML = doc.body.innerHTML;
+    el.hidden = false;
+    wireControls(el, p.name);
+    wireLinks(el);
+  }
+
+  function valuesOf(root) {
+    const out = {};
+    for (const i of root.querySelectorAll('input, select, textarea')) {
+      if (!i.name) continue;
+      if ((i.type === 'checkbox' || i.type === 'radio') && !i.checked) continue;
+      out[i.name] = i.value;
+    }
+    return out;
+  }
+
+  function wireControls(el, plugin) {
+    for (const form of el.querySelectorAll('form[data-action]')) {
+      form.onsubmit = async (e) => { e.preventDefault(); await act(plugin, form.dataset.action, valuesOf(form)); };
+      for (const i of form.querySelectorAll('input[type=range], select, input[type=checkbox]')) {
+        i.onchange = async () => { await act(plugin, form.dataset.action, valuesOf(form)); };
+      }
+    }
+    for (const i of el.querySelectorAll('input[data-action], select[data-action]')) {
+      i.onchange = async () => { const v = {}; v[i.name || 'value'] = i.value; await act(plugin, i.dataset.action, v); };
+    }
+  }
+
+  async function act(plugin, action, values) {
+    try { await api.Act(plugin, action, values); } catch (err) { console.error(err); }
+  }
+
+  // A link inside this window goes nowhere: the view has no tabs and no
+  // address bar. So every link is opened in the machine's own browser, which
+  // is where a chart or a page on the server belongs anyway.
+  function wireLinks(el) {
+    for (const a of el.querySelectorAll('a[href]')) {
+      a.onclick = (e) => { e.preventDefault(); open(a.getAttribute('href')); };
+    }
+  }
+
+  async function open(address) {
+    if (!address) return;
+    try { await api.Open(address); } catch (err) { console.error(err); }
+  }
+
+  Events.On('pacenote:status', (ev) => render(ev.data));
+  Events.On('pacenote:pairing', (ev) => render(ev.data));
+  Events.On('pacenote:error', (ev) => render(ev.data));
+  Events.On('pacenote:board', async () => { try { renderPlugins(await api.Companions()); } catch (err) { console.error(err); } });
+
+  api.Status().then(render).catch(console.error);
+</script>
+</body>
+</html>
