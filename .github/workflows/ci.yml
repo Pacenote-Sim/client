@@ -36,6 +36,16 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
 
+      # The window is a web view, and on Linux that is GTK4 and WebKitGTK,
+      # which a runner does not have. A server building a driver's exe needs
+      # none of this — that build is for Windows with cgo off — but vetting the
+      # window here means one `make vet` means the same thing everywhere.
+      - name: The window's Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends pkg-config libgtk-4-dev libwebkitgtk-6.0-dev
+
       - name: Build and vet
         run: |
           make build
