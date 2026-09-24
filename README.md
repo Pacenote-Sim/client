@@ -155,5 +155,12 @@ how to drive a real telemetry file through it.
 
 ## Licence
 
-GNU General Public License, version 3 — see `LICENSE`. The contract it is built on
-(`github.com/pacenote-sim/clientplugin`) is Apache-2.0.
+GNU General Public License, version 3 or later — see `LICENSE` — with the **Pacenote Plugin
+Exception** in `LICENSE-EXCEPTION`.
+
+The exception is what lets a plugin carry its own licence. A client plugin is written against
+`github.com/pacenote-sim/clientplugin`, which is Apache-2.0; the exception says that such a plugin
+is not a work based on the client, and that an executable compiled from the client and a set of
+plugins may be handed out under any terms for the plugins, as long as the client's own part stays
+GPL and its source stays available. Change the client itself and the GPL applies to your change,
+exception or not.
